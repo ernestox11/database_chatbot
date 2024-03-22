@@ -5,6 +5,7 @@ Welcome to the GitHub repository for our tutorial on building a natural language
 🟡 This repository serves as supporting material for the [YouTube video tutorial](https://youtu.be/YqqRkuizNN4).
 
 ## Features
+
 - **Natural Language Processing**: Uses GPT-4 to interpret and respond to user queries in natural language.
 - **SQL Query Generation**: Dynamically generates SQL queries based on the user's natural language input.
 - **Database Interaction**: Connects to a SQL database to retrieve query results, demonstrating practical database interaction.
@@ -24,6 +25,7 @@ For a more detailed explanation and a step-by-step guide, refer this other video
 For a more detailed explanation and a step-by-step guide, refer to the [YouTube video tutorial](Chat with MySQL Database with Python | LangChain Tutorial).
 
 ## Installation
+
 Ensure you have Python installed on your machine. Then clone this repository:
 
 ```bash
@@ -44,16 +46,19 @@ OPENAI_API_KEY=[your-openai-api-key]
 ```
 
 ## Usage
+
 To launch the Streamlit app and interact with the chatbot:
 
 ```bash
-streamlit run app.py
+streamlit run src/app.py
 ```
 
 ## Contributing
+
 As this repository accompanies the [YouTube video tutorial](https://youtu.be/YqqRkuizNN4), we are primarily focused on providing a comprehensive learning experience. Contributions for bug fixes or typos are welcome.
 
 ## License
+
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ---
@@ -68,6 +73,6 @@ Happy Coding! 🚀👨‍💻🤖
 
 ---
 
-*If you find this project helpful, please consider giving it a star!*
+_If you find this project helpful, please consider giving it a star!_
 
 ---
