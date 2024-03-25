@@ -1,19 +1,40 @@
 from dotenv import load_dotenv
+import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_community.utilities import SQLDatabase
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
-from langchain_groq import ChatGroq
-import streamlit as st
+import os
 
+# Initialize environment variables
+load_dotenv()
+
+# Set Streamlit page configuration
+st.set_page_config(page_title="Chat with MySQL", page_icon=":speech_balloon:")
+
+# Database connection settings (extracted from environment variables for security)
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_DATABASE = os.getenv("DB_DATABASE")
+
+
+# Function to initialize database connection
+@st.cache_resource
 def init_database(user: str, password: str, host: str, port: str, database: str) -> SQLDatabase:
-  db_uri = f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{database}"
-  return SQLDatabase.from_uri(db_uri)
+    db_uri = f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{database}"
+    return SQLDatabase.from_uri(db_uri)
+
+# Attempt to establish the database connection
+db = init_database(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE)
+if db is not None:
+    st.success("Connected to database!")
 
 def get_sql_chain(db):
-  template = """
+    template = """
     You are a data analyst at a company. You are interacting with a user who is asking you questions about the information in the database which is releted to a survey.
     The database structure comprises two main tables: questions and survey_responses. The questions table stores each question's unique ID, full question text (question_text), and its original position in the Excel file (excel_column_position). The survey_responses table captures answers, associating each with the relevant question through the question_id field, which references the id in the questions table. This design facilitates queries by either question content or Excel column position, ensuring precise data retrieval and analysis.
     Analysis will exclude responses with a value of 99, or cases where the user doesn't know the answer (No sabe) or doesn't answer (No contesta), or empty cells, ensuring clarity and precision in data handling.
@@ -37,27 +58,24 @@ def get_sql_chain(db):
     Question: {question}
     SQL Query:
     """
+    prompt = ChatPromptTemplate.from_template(template)
+    llm = ChatOpenAI(model="gpt-4-turbo-preview")
+    # llm = ChatOpenAI(model="gpt-3.5-turbo")
+    # llm = ChatGroq(model="mixtral-8x7b-32768", temperature=0)
 
-  prompt = ChatPromptTemplate.from_template(template)
+    def get_schema(_):
+        return db.get_table_info()
 
-  llm = ChatOpenAI(model="gpt-4-turbo-preview")
-  # llm = ChatOpenAI(model="gpt-3.5-turbo")
-  # llm = ChatGroq(model="mixtral-8x7b-32768", temperature=0)
-
-  def get_schema(_):
-    return db.get_table_info()
-
-  return (
-    RunnablePassthrough.assign(schema=get_schema)
-    | prompt
-    | llm
-    | StrOutputParser()
-  )
+    return (
+        RunnablePassthrough.assign(schema=get_schema)
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
 
 def get_response(user_query: str, db: SQLDatabase, chat_history: list):
-  sql_chain = get_sql_chain(db)
-
-  template = """
+    sql_chain = get_sql_chain(db)
+    template = """
     You are a data analyst at a company. You are interacting with a user who is asking you questions about the company's database.
     Based on the table schema below, question, sql query, and sql response, write a natural language response in spanish.
     <SCHEMA>{schema}</SCHEMA>
@@ -67,61 +85,32 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     User question: {question}
     SQL Response: {response}"""
 
-  prompt = ChatPromptTemplate.from_template(template)
+    prompt = ChatPromptTemplate.from_template(template)
+    llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
-  llm = ChatOpenAI(model="gpt-4-turbo-preview")
-  # llm = ChatOpenAI(model="gpt-3.5-turbo")
-  # llm = ChatGroq(model="mixtral-8x7b-32768", temperature=0)
-
-  chain = (
-    RunnablePassthrough.assign(query=sql_chain).assign(
-      schema=lambda _: db.get_table_info(),
-      response=lambda vars: db.run(vars["query"]),
+    chain = (
+        RunnablePassthrough.assign(query=sql_chain).assign(
+            schema=lambda _: db.get_table_info(),
+            response=lambda vars: db.run(vars["query"]),
+        )
+        | prompt
+        | llm
+        | StrOutputParser()
     )
-    | prompt
-    | llm
-    | StrOutputParser()
-  )
 
-  return chain.invoke({
-    "question": user_query,
-    "chat_history": chat_history,
-  })
-
+    return chain.invoke({
+        "question": user_query,
+        "chat_history": chat_history,
+    })
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
-      AIMessage(content="Hello! I'm a SQL assistant. Ask me anything about your database."),
+        AIMessage(content="Hello! I'm a SQL assistant. Ask me anything about your database."),
     ]
-
-load_dotenv()
-
-st.set_page_config(page_title="Chat with MySQL", page_icon=":speech_balloon:")
 
 st.title("Chat with MySQL")
 
-with st.sidebar:
-    st.subheader("Settings")
-    st.write("This is a simple chat application using MySQL. Connect to the database and start chatting.")
-
-    st.text_input("Host", value="localhost", key="Host")
-    st.text_input("Port", value="3306", key="Port")
-    st.text_input("User", value="luis", key="User")
-    st.text_input("Password", type="password", value="ernecio1234", key="Password")
-    st.text_input("Database", value="pruebas", key="Database")
-
-    if st.button("Connect"):
-        with st.spinner("Connecting to database..."):
-            db = init_database(
-                st.session_state["User"],
-                st.session_state["Password"],
-                st.session_state["Host"],
-                st.session_state["Port"],
-                st.session_state["Database"]
-            )
-            st.session_state.db = db
-            st.success("Connected to database!")
-
+# Chat interface to display messages and handle user input
 for message in st.session_state.chat_history:
     if isinstance(message, AIMessage):
         with st.chat_message("AI"):
@@ -137,8 +126,9 @@ if user_query is not None and user_query.strip() != "":
     with st.chat_message("Human"):
         st.markdown(user_query)
 
+    response = get_response(user_query, db, st.session_state.chat_history)
+    
     with st.chat_message("AI"):
-        response = get_response(user_query, st.session_state.db, st.session_state.chat_history)
         st.markdown(response)
 
     st.session_state.chat_history.append(AIMessage(content=response))
