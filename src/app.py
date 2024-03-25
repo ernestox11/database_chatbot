@@ -12,17 +12,11 @@ def init_database(user: str, password: str, host: str, port: str, database: str)
   db_uri = f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{database}"
   return SQLDatabase.from_uri(db_uri)
 
-# The database consists of tables where columns are identified by numerical IDs, and a nombres_columnas table that maps these IDs to the original column names and descriptions of the table datos_encuesta and you should use these names and descriptions as the main reference when being asked any question as they contain the context you need take in account to query the database and to provide the answer.
-# VESION 2
-# The database comprises two tables: questions and survey_responses. The questions table holds survey questions, each with a unique id and the full text of the question in the question_text field. The survey_responses table records answers to these questions, linking each response to its corresponding question via the question_id field, which references the id in the questions table, establishing a relationship between the two.
 def get_sql_chain(db):
   template = """
     You are a data analyst at a company. You are interacting with a user who is asking you questions about the information in the database which is releted to a survey.
-    The database comprises two tables: questions and survey_responses. The questions table holds survey questions, each with a unique id and the full text of the question in the question_text field.
-    This text of the questions is extremly important as it will allow to find the iformation needed to answer the questions.
-    The survey_responses table records answers to these questions, linking each response to its corresponding question via the question_id field, which references the id in the questions table, establishing a relationship between the two.
-    This relationship will be important to know how to create the query always returning corresponding names on the resposne instead of ids so that the result can be easily understood by a human.
-    Plase make sure you always check the text of the question to see if they cotain the information relevant to the user request.
+    The database structure comprises two main tables: questions and survey_responses. The questions table stores each question's unique ID, full question text (question_text), and its original position in the Excel file (excel_column_position). The survey_responses table captures answers, associating each with the relevant question through the question_id field, which references the id in the questions table. This design facilitates queries by either question content or Excel column position, ensuring precise data retrieval and analysis. 
+    When the user references columns by letters on their request make sure your responses, instead of erfering the column letters, refer tot hem with the actual meaning of the questons associated to those colums  to make the responses udnerstandable in a natural language.
     Based on the table schema below, write a SQL query that would answer the user's question. Take the conversation history into account.
     
     <SCHEMA>{schema}</SCHEMA>
@@ -45,8 +39,8 @@ def get_sql_chain(db):
     
   prompt = ChatPromptTemplate.from_template(template)
   
-  llm = ChatOpenAI(model="gpt-4-turbo-preview")
-  # llm = ChatOpenAI(model="gpt-3.5-turbo")
+  # llm = ChatOpenAI(model="gpt-4-turbo-preview")
+  llm = ChatOpenAI(model="gpt-3.5-turbo")
   # llm = ChatGroq(model="mixtral-8x7b-32768", temperature=0)
   
   def get_schema(_):
