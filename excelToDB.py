@@ -1,5 +1,5 @@
-import pandas as pd
 import re
+import pandas as pd
 from sqlalchemy import create_engine, text
 
 # Database connection details
@@ -11,12 +11,21 @@ engine = create_engine(f'mysql+pymysql://{username}:{password}@{host}/{database}
 
 excel_file = 'encuesta_completa.xlsx'
 
+def excel_col_index_to_letter(index):
+    """Convert a zero-indexed column number to an Excel column letter."""
+    letter = ''
+    while index > 0:
+        index, remainder = divmod(index - 1, 26)
+        letter = chr(65 + remainder) + letter
+    return letter
+
 def create_tables(conn):
-    # Create tables for storing questions and responses
+    # Adjusted to include the new column
     conn.execute(text("""
     CREATE TABLE IF NOT EXISTS questions (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        question_text VARCHAR(1024) UNIQUE NOT NULL
+        question_text VARCHAR(1024) UNIQUE NOT NULL,
+        excel_column_position VARCHAR(5)
     )
     """))
     conn.execute(text("""
@@ -30,16 +39,14 @@ def create_tables(conn):
 
 def insert_questions_get_ids(df, conn):
     question_ids = {}
-    # Regex pattern to match 'P' followed by a number
-    pattern = r'^P\d+'
-    for col in df.columns:
-        # Check if column name matches the pattern
-        if re.match(pattern, col):
+    for index, col in enumerate(df.columns):
+        col_letter = excel_col_index_to_letter(index + 1)
+        if re.match(r'^P\d+', col):
             conn.execute(text("""
-            INSERT INTO questions (question_text)
-            VALUES (:question)
-            ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), question_text=VALUES(question_text)
-            """), {'question': col})
+            INSERT INTO questions (question_text, excel_column_position)
+            VALUES (:question, :col_letter)
+            ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), question_text=VALUES(question_text), excel_column_position=VALUES(excel_column_position)
+            """), {'question': col, 'col_letter': col_letter})
             result = conn.execute(text("SELECT LAST_INSERT_ID()"))
             question_id = result.fetchone()[0]
             question_ids[col] = question_id
@@ -47,26 +54,18 @@ def insert_questions_get_ids(df, conn):
 
 def insert_responses(df, question_ids, conn):
     for index, row in df.iterrows():
-        for question, response in row.items(): 
-            if question in question_ids:  # Check if the question was inserted
-                # Convert NaN values to None
-                if pd.isnull(response):
-                    response = None
-                question_id = question_ids[question]
+        for question, response in row.items():
+            if question in question_ids:  # Ensure the question is one we've inserted
+                response = response if not pd.isnull(response) else None
                 conn.execute(text("""
                 INSERT INTO survey_responses (question_id, response)
                 VALUES (:question_id, :response)
-                """), {'question_id': question_id, 'response': response})
+                """), {'question_id': question_ids[question], 'response': response})
 
 with engine.begin() as conn:
     create_tables(conn)
-    
     xls = pd.ExcelFile(excel_file)
     for sheet_name in xls.sheet_names:
         df = pd.read_excel(xls, sheet_name=sheet_name)
-        
-        # Insert question names and get their IDs if they match the pattern
         question_ids = insert_questions_get_ids(df, conn)
-        
-        # Insert responses for each matching question
         insert_responses(df, question_ids, conn)
