@@ -44,11 +44,11 @@ def get_sql_chain(db):
 
     Conversation History: {chat_history}
 
-    Write only the SQL query and nothing else.
-
     For example:
     Question: How many articles mentioned 'sustainability' last month?
     SQL Query: SELECT COUNT(*) FROM tourism_data WHERE title LIKE '%sustainability%' AND publish_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH);
+    
+    Return only the SQL query and nothing else.
     """
 
     prompt = ChatPromptTemplate.from_template(template)
