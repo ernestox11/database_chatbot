@@ -31,16 +31,28 @@ def init_database(user: str, password: str, host: str, port: str, database: str)
 db = init_database(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE)
 if db is not None:
     st.success("Connected to database!")
+else:
+    st.error("Failed to connect to the database.")
 
 def get_sql_chain(db):
     template = """
-    You are a data analyst. Formulate an SQL query based on the user's input and the database schema provided.
+    You are a data analyst with a bilingual database schema. Based on the conversation history and understanding both English and Spanish column names, formulate a SQL query to retrieve data as requested by the user.
+
+    The table 'tourism_data' contains columns in both English and Spanish. Use this dual-language schema to accurately determine which columns are relevant to the user's question and generate an appropriate SQL query.
+
+    <SCHEMA>{schema}</SCHEMA>
+
+    Conversation History: {chat_history}
+
+    Only write the SQL query.
     """
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
     def get_schema(_):
-        return db.get_table_info()
+        schema = db.get_table_info()
+        print("Database Schema:", schema)  # Console log for debugging
+        return schema
 
     return (
         RunnablePassthrough.assign(schema=get_schema)
@@ -50,34 +62,16 @@ def get_sql_chain(db):
     )
 
 def get_response(user_query: str, db: SQLDatabase, chat_history: list):
-    sql_chain = get_sql_chain(db)
-    prompt_template = """
-    Translate the SQL query result into a user-friendly response in English. Include details from the schema, user query, and SQL query to construct the response.
-    """
-
-    prompt = ChatPromptTemplate.from_template(prompt_template)
-    llm = ChatOpenAI(model="gpt-4-turbo-preview")
-
-    chain = (
-        RunnablePassthrough.assign(query=sql_chain).assign(
-            schema=lambda _: db.get_table_info(),
-            response=lambda vars: db.run(vars["query"]),
-        )
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
-
     try:
-        response = chain.invoke({
-            "question": user_query,
-            "chat_history": chat_history,
-        })
-    except Exception as e:
-        st.error(f"Unable to process query: {e}")
-        response = "I'm sorry, I couldn't understand your request. Could you please clarify or try a different question?"
+        sql_chain = get_sql_chain(db)
+        sql_query = sql_chain.invoke({"chat_history": chat_history})
+        print("Generated SQL Query:", sql_query)  # Console log for debugging
 
-    return response
+        response = db.run(sql_query)
+        return response
+    except Exception as e:
+        print("Error running SQL query:", e)  # Console log for debugging
+        return "Sorry, I encountered an issue with your request. Could you please specify it differently?"
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
