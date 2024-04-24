@@ -24,6 +24,7 @@ try:
 except Exception as e:
     logger.error(f"Error creating database engine: {e}")
 
+excel_file = 'encuesta.xlsx'
 excel_file = 'encuesta_completa.xlsx'
 
 def excel_col_index_to_letter(index):
