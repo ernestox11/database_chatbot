@@ -6,6 +6,7 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_community.utilities import SQLDatabase
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
+from sqlalchemy.exc import SQLAlchemyError
 import os
 
 # Initialize environment variables
@@ -75,29 +76,40 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     Conversation History: {chat_history}
     SQL Query: <SQL>{query}</SQL>
     User question: {question}
-    SQL Response: {response}"""
+    SQL Response: {response}
+    """
 
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
-    chain = (
-        RunnablePassthrough.assign(query=sql_chain).assign(
-            schema=lambda _: db.get_table_info(),
-            response=lambda vars: db.run(vars["query"]),
-        )
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
+    # Invoke the SQL chain to generate the query and handle possible exceptions
+    try:
+        # Here you need to make sure sql_chain.invoke() is called correctly
+        # and that it returns a string that is a valid SQL query
+        sql_query = sql_chain.invoke({"schema": lambda _: db.get_table_info(), "chat_history": chat_history})
+        db_response = db.run(sql_query)  # This is where you execute the SQL query
+        final_response = prompt.invoke({
+            "schema": lambda _: db.get_table_info(),
+            "chat_history": chat_history,
+            "query": sql_query,
+            "response": db_response
+        })
+    except SQLAlchemyError as e:
+        # If an SQLAlchemyError occurred, provide a friendly error message
+        final_response = "Oops! An error occurred while executing your query. " \
+                         "Please make sure your query is correctly formatted and try again. " \
+                         f"Technical details: {e}"
+        st.error("Error executing the SQL query.")  # Display the error in Streamlit
+    except Exception as e:
+        # Handle any other exception that could occur
+        final_response = f"An unexpected error occurred: {e}"
+        st.error("An unexpected error occurred.")
 
-    return chain.invoke({
-        "question": user_query,
-        "chat_history": chat_history,
-    })
+    return final_response
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
-        AIMessage(content="Hello! I'm your assistant. Ask me any questions about our tourism database."),
+        AIMessage(content="¡Hola! Soy tu asistente. Hazme cualquier pregunta sobre nuestra base de datos de artículos de turismo."),
     ]
 
 st.title("Chat with MySQL")
