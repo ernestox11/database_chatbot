@@ -21,7 +21,6 @@ DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_DATABASE = os.getenv("DB_DATABASE")
 
-
 # Function to initialize database connection
 @st.cache_resource
 def init_database(user: str, password: str, host: str, port: str, database: str) -> SQLDatabase:
@@ -35,33 +34,24 @@ if db is not None:
 
 def get_sql_chain(db):
     template = """
-    You are a data analyst at a company. You are interacting with a user who is asking you questions about the information in the database which is releted to a survey.
-    The database structure comprises two main tables: questions and survey_responses. The questions table stores each question's unique ID, full question text (question_text), and its original position in the Excel file (excel_column_position). The survey_responses table captures answers, associating each with the relevant question through the question_id field, which references the id in the questions table. This design facilitates queries by either question content or Excel column position, ensuring precise data retrieval and analysis.
-    Analysis will exclude responses with a value of 99, or cases where the user doesn't know the answer (No sabe) or doesn't answer (No contesta), or empty cells, ensuring clarity and precision in data handling.
-    When the user references columns by letters on their request make sure your responses, instead of erfering the column letters, refer tot hem with the actual meaning of the questons associated to those colums  to make the responses udnerstandable in a natural language.
-    Based on the table schema below, write a SQL query that would answer the user's question. Take the conversation history into account.
+    You are a data analyst in a tourism company. Your task involves handling queries about the tourism articles database. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
+
+    The database structure includes a table 'tourism_data' that captures each article's comprehensive details. Your task is to formulate SQL queries that precisely fetch the data as per the user's request.
+
+    Based on the table schema below and the conversation history, write a SQL query to answer the user's question.
 
     <SCHEMA>{schema}</SCHEMA>
 
     Conversation History: {chat_history}
 
-    Write only the SQL query and nothing else. Do not wrap the SQL query in any other text, not even backticks.
+    Write only the SQL query and nothing else.
 
     For example:
-    Question: which 3 artists have the most tracks?
-    SQL Query: SELECT ArtistId, COUNT(*) as track_count FROM Track GROUP BY ArtistId ORDER BY track_count DESC LIMIT 3;
-    Question: Name 10 artists
-    SQL Query: SELECT Name FROM Artist LIMIT 10;
-
-    Your turn:
-
-    Question: {question}
-    SQL Query:
+    Question: How many articles mentioned 'sustainability' last month?
+    SQL Query: SELECT COUNT(*) FROM tourism_data WHERE topics LIKE '%sustainability%' AND publish_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH);
     """
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
-    # llm = ChatOpenAI(model="gpt-3.5-turbo")
-    # llm = ChatGroq(model="mixtral-8x7b-32768", temperature=0)
 
     def get_schema(_):
         return db.get_table_info()
@@ -76,8 +66,10 @@ def get_sql_chain(db):
 def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     sql_chain = get_sql_chain(db)
     template = """
-    You are a data analyst at a company. You are interacting with a user who is asking you questions about the company's database.
-    Based on the table schema below, question, sql query, and sql response, write a natural language response in spanish.
+    As a data analyst, you are tasked with translating complex database queries into natural language answers that are easy to understand. Here, the user is inquiring about specific tourism-related data stored in our 'tourism_data' table.
+
+    Based on the table schema, the user's question, the SQL query you formulated, and the database's response, craft a response in Spanish that accurately and effectively communicates the needed information.
+
     <SCHEMA>{schema}</SCHEMA>
 
     Conversation History: {chat_history}
@@ -105,7 +97,7 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
-        AIMessage(content="Hello! I'm a SQL assistant. Ask me anything about your database."),
+        AIMessage(content="Hello! I'm your assistant. Ask me any questions about our tourism database."),
     ]
 
 st.title("Chat with MySQL")
