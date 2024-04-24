@@ -34,21 +34,7 @@ if db is not None:
 
 def get_sql_chain(db):
     template = """
-    You are a data analyst in a tourism company. Your task involves handling queries about the tourism articles database. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles relyig on the column names as a reference to interpret the user queries.
-
-    The database structure includes a table 'tourism_data' that captures each article's comprehensive details. Your task is to formulate SQL queries that precisely fetch the data as per the user's request.
-
-    Based on the table schema below and the conversation history, write a SQL query to answer the user's question.
-
-    <SCHEMA>{schema}</SCHEMA>
-
-    Conversation History: {chat_history}
-
-    Write only the SQL query and nothing else.
-
-    For example:
-    Question: How many articles mentioned 'sustainability' last month?
-    SQL Query: SELECT COUNT(*) FROM tourism_data WHERE topics LIKE '%sustainability%' AND publish_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH);
+    You are a data analyst. Formulate an SQL query based on the user's input and the database schema provided.
     """
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
@@ -65,19 +51,11 @@ def get_sql_chain(db):
 
 def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     sql_chain = get_sql_chain(db)
-    template = """
-    As a data analyst, you are tasked with translating complex database queries into natural language answers that are easy to understand. Here, the user is inquiring about specific tourism-related data stored in our 'tourism_data' table.
+    prompt_template = """
+    Translate the SQL query result into a user-friendly response in English. Include details from the schema, user query, and SQL query to construct the response.
+    """
 
-    Based on the table schema, the user's question, the SQL query you formulated, and the database's response, craft a response in Spanish that accurately and effectively communicates the needed information.
-
-    <SCHEMA>{schema}</SCHEMA>
-
-    Conversation History: {chat_history}
-    SQL Query: <SQL>{query}</SQL>
-    User question: {question}
-    SQL Response: {response}"""
-
-    prompt = ChatPromptTemplate.from_template(template)
+    prompt = ChatPromptTemplate.from_template(prompt_template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
     chain = (
@@ -90,10 +68,16 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
         | StrOutputParser()
     )
 
-    return chain.invoke({
-        "question": user_query,
-        "chat_history": chat_history,
-    })
+    try:
+        response = chain.invoke({
+            "question": user_query,
+            "chat_history": chat_history,
+        })
+    except Exception as e:
+        st.error(f"Unable to process query: {e}")
+        response = "I'm sorry, I couldn't understand your request. Could you please clarify or try a different question?"
+
+    return response
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
