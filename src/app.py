@@ -74,38 +74,32 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     <SCHEMA>{schema}</SCHEMA>
 
     Conversation History: {chat_history}
-    SQL Query: <SQL>{query}</SQL>
     User question: {question}
+    SQL Query: <SQL>{query}</SQL>
     SQL Response: {response}
     """
 
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
-    # Invoke the SQL chain to generate the query and handle possible exceptions
     try:
-        # Here you need to make sure sql_chain.invoke() is called correctly
-        # and that it returns a string that is a valid SQL query
-        sql_query = sql_chain.invoke({"schema": lambda _: db.get_table_info(), "chat_history": chat_history})
-        db_response = db.run(sql_query)  # This is where you execute the SQL query
-        final_response = prompt.invoke({
+        # Run the SQL chain to get the SQL query
+        generated_query = sql_chain.invoke({"schema": lambda _: db.get_table_info(), "chat_history": chat_history, "question": user_query})
+
+        # Execute the SQL query and get the response
+        db_response = db.run(generated_query)
+        # Pass all necessary variables to the llm
+        response = llm.invoke({
             "schema": lambda _: db.get_table_info(),
             "chat_history": chat_history,
-            "query": sql_query,
+            "question": user_query,
+            "query": generated_query,
             "response": db_response
         })
-    except SQLAlchemyError as e:
-        # If an SQLAlchemyError occurred, provide a friendly error message
-        final_response = "Oops! An error occurred while executing your query. " \
-                         "Please make sure your query is correctly formatted and try again. " \
-                         f"Technical details: {e}"
-        st.error("Error executing the SQL query.")  # Display the error in Streamlit
     except Exception as e:
-        # Handle any other exception that could occur
-        final_response = f"An unexpected error occurred: {e}"
-        st.error("An unexpected error occurred.")
+        response = f"An unexpected error occurred: {e}"
 
-    return final_response
+    return response
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
