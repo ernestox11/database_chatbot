@@ -74,36 +74,44 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     <SCHEMA>{schema}</SCHEMA>
 
     Conversation History: {chat_history}
-    User question: {question}
     SQL Query: <SQL>{query}</SQL>
-    SQL Response: {response}
-    """
+    User question: {question}
+    SQL Response: {response}"""
 
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
+    chain = (
+        RunnablePassthrough.assign(query=sql_chain).assign(
+            schema=lambda _: db.get_table_info(),
+            response=lambda vars: db.run(vars["query"]),
+        )
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
     try:
-        # Run the SQL chain to get the SQL query
-        generated_query = sql_chain.invoke({"schema": lambda _: db.get_table_info(), "chat_history": chat_history, "question": user_query})
-
-        # Execute the SQL query and get the response
-        db_response = db.run(generated_query)
-        # Pass all necessary variables to the llm
-        response = llm.invoke({
-            "schema": lambda _: db.get_table_info(),
-            "chat_history": chat_history,
+        # Execute the chain to process and handle the query
+        response = chain.invoke({
             "question": user_query,
-            "query": generated_query,
-            "response": db_response
+            "chat_history": chat_history,
         })
+        return response
+    except SQLAlchemyError as e:
+        # Handle SQL execution errors
+        error_message = "An error occurred while processing your query: " + str(e)
+        st.error(error_message)
+        return "An error occurred while processing your query. Please check the query and try again."
     except Exception as e:
-        response = f"An unexpected error occurred: {e}"
-
-    return response
-
+        # Handle other types of errors
+        error_message = "An unexpected error occurred: " + str(e)
+        st.error(error_message)
+        return "An unexpected error occurred. Please try again later."
+    
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
-        AIMessage(content="¡Hola! Soy tu asistente. Hazme cualquier pregunta sobre nuestra base de datos de artículos de turismo."),
+        AIMessage(content="Hello! I'm your assistant. Ask me any questions about our tourism database."),
     ]
 
 st.title("Chat with MySQL")
