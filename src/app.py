@@ -8,18 +8,14 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 from sqlalchemy.exc import SQLAlchemyError
 import os
-import logging
 
 # Initialize environment variables
 load_dotenv()
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-
 # Set Streamlit page configuration
 st.set_page_config(page_title="Chat with MySQL", page_icon=":speech_balloon:")
 
-# Database connection settings
+# Database connection settings (extracted from environment variables for security)
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
@@ -30,20 +26,14 @@ DB_DATABASE = os.getenv("DB_DATABASE")
 @st.cache_resource
 def init_database(user: str, password: str, host: str, port: str, database: str) -> SQLDatabase:
     db_uri = f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{database}"
-    logging.info(f"Database URI: {db_uri}")
     return SQLDatabase.from_uri(db_uri)
 
-# Establish the database connection
+# Attempt to establish the database connection
 db = init_database(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE)
 if db is not None:
     st.success("Connected to database!")
 
 def get_sql_chain(db):
-    def get_schema(_):
-        schema = db.get_table_info()
-        logging.info(f"Schema: {schema}")
-        return schema
-
     template = """
     You are a data analyst tasked with creating SQL queries based on user requests. Each request pertains to data stored in a 'tourism_data' table which includes various columns like 'Article Title', 'Creation Date', etc. This database consists of detailed entries about various articles.
 
@@ -57,9 +47,11 @@ def get_sql_chain(db):
 
     Ensure your response contains only the SQL query, correctly formatted for MySQL, especially ensuring proper use of backticks for column names with spaces or special characters.
     """
-
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
+
+    def get_schema(_):
+        return db.get_table_info()
 
     return (
         RunnablePassthrough.assign(schema=get_schema)
@@ -92,10 +84,7 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     chain = (
         RunnablePassthrough.assign(query=sql_chain).assign(
             schema=lambda _: db.get_table_info(),
-            response=lambda vars: {
-                'query': vars['query'],  # Pass the raw query for logging
-                'result': db.run(vars["query"])
-            },
+            response=lambda vars: db.run(vars["query"]),
         )
         | prompt
         | llm
@@ -103,25 +92,23 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     )
 
     try:
+        # Execute the chain to process and handle the query
         response = chain.invoke({
             "question": user_query,
-            "chat_history": chat_history[-4:]  # To manage token usage
+            "chat_history": chat_history,
         })
-        # Log the raw SQL query before execution
-        logging.info(f"Executing SQL Query: {response['query']}")
-        logging.info(f"Response: {response['result']}")
-        return response['result']
+        return response
     except SQLAlchemyError as e:
+        # Handle SQL execution errors
         error_message = "An error occurred while processing your query: " + str(e)
         st.error(error_message)
-        logging.error(f"SQLAlchemy Error: {error_message}")
         return "An error occurred while processing your query. Please check the query and try again."
     except Exception as e:
+        # Handle other types of errors
         error_message = "An unexpected error occurred: " + str(e)
         st.error(error_message)
-        logging.error(f"General Error: {error_message}")
         return "An unexpected error occurred. Please try again later."
-
+    
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
         AIMessage(content="Hello! I'm your assistant. Ask me any questions about our tourism database."),
@@ -141,9 +128,13 @@ for message in st.session_state.chat_history:
 user_query = st.chat_input("Type a message...")
 if user_query is not None and user_query.strip() != "":
     st.session_state.chat_history.append(HumanMessage(content=user_query))
+
     with st.chat_message("Human"):
         st.markdown(user_query)
+
     response = get_response(user_query, db, st.session_state.chat_history)
+    
     with st.chat_message("AI"):
         st.markdown(response)
+
     st.session_state.chat_history.append(AIMessage(content=response))
