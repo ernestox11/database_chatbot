@@ -45,17 +45,19 @@ def get_sql_chain(db):
         return schema
 
     template = """
-    You are a data analyst in a tourism company. Your task involves handling queries about the tourism articles database. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
+    You are a data analyst in a tourism company, responsible for handling queries regarding a database that tracks various articles. Each article entry includes details such as titles, URLs, domains, sentiments, and other categorizations relevant to tourism.
 
-    The database structure includes a table 'tourism_data' that captures each article's comprehensive details. Your task is to formulate SQL queries that precisely fetch the data as per the user's request.
+    The structure of the 'tourism_data' table includes various fields that store these details. Your task is to understand user queries, which may not directly mention specific column names, and translate them into SQL queries that fetch the required data.
 
-    Based on the table schema below and the conversation history, write a SQL query to answer the user's question.
+    Please infer the relevant database columns from the user's question, which might use natural language or indirect references to the data stored in the database. Use your understanding of the schema and the context provided by the user's conversation history to craft precise SQL queries.
 
+    Here is the schema for your reference:
     <SCHEMA>{schema}</SCHEMA>
 
-    Conversation History: {chat_history}
+    Recent user interactions for context:
+    {chat_history}
 
-    Write only the SQL query and nothing else. Do not wrap the SQL query in any other text, not even backticks.
+    Respond with the SQL query alone, ensuring it is syntactically correct and relevant to the user's inquiry.
     """
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
@@ -67,19 +69,18 @@ def get_sql_chain(db):
         | StrOutputParser()
     )
 
+
 def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     sql_chain = get_sql_chain(db)
     template = """
     As a data analyst, you are tasked with translating complex database queries into natural language answers that are easy to understand. Here, the user is inquiring about specific tourism-related data stored in our 'tourism_data' table.
 
-    Based on the table schema, the user's question, the SQL query you formulated, and the database's response, craft a response in Spanish that accurately and effectively communicates the needed information.
+    Based on the table schema, your recent query '{question}', the SQL query you formulated, and the database's response, craft a response in Spanish that accurately and effectively communicates the needed information.
 
-    <SCHEMA>{schema}</SCHEMA>
-
-    Conversation History: {chat_history}
-    SQL Query: <SQL>{query}</SQL>
-    User question: {question}
-    SQL Response: {response}
+    Detailed Schema Information: {schema}
+    Recent Conversation Extract: {chat_history}
+    Formulated SQL Query: {query}
+    Query Execution Result: {response}
     """
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
@@ -98,7 +99,7 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
         # Execute the chain to process and handle the query
         response = chain.invoke({
             "question": user_query,
-            "chat_history": chat_history,
+            "chat_history": chat_history[-4:],  # Use only the last 4 messages to avoid excessive token usage
         })
         logging.info(f"Response: {response}")
         return response
