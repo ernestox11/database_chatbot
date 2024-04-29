@@ -63,7 +63,7 @@ def get_sql_chain(db):
     Recent user interactions for context:
     {chat_history}
 
-    Start your response directly with 'SELECT', 'INSERT', 'UPDATE', or 'DELETE' without any labels or additional text.
+    Your response must contain only the raw mysql query starting with either 'SELECT', 'INSERT', 'UPDATE', or 'DELETE' ensuring it is correctly formatted (specially when column names have spaces or special characters) and nothing else.
     """
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
