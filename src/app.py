@@ -45,16 +45,17 @@ def get_sql_chain(db):
         return schema
 
     template = """
-    You are a data analyst in a tourism company. Your task involves handling queries about the tourism articles database. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
+        You are a data analyst in a tourism company. Your task involves handling queries about the tourism articles database. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
 
-    Schema details for reference:
-    <SCHEMA>{schema}</SCHEMA>
+        Schema details for reference:
+        <SCHEMA>{schema}</SCHEMA>
 
-    Recent user interactions for context:
-    {chat_history}
+        Recent user interactions for context:
+        {chat_history}
 
-    The database structure includes a table 'tourism_data' that captures each article's comprehensive details. Use the provided schema information and recent conversation history to interpret the user's query. Please infer the relevant database columns from the user's question, which might use natural language or indirect references to the data stored in the database. Ensure your response strictly contains only the SQL query, free of any additional formatting or text, and is relevant to the user's inquiry. Do not wrap the SQL query in any other text, not even backticks.
-    """
+        The database structure includes a table 'tourism_data' that captures each article's comprehensive details. Use the provided schema information and recent conversation history to interpret the user's query. Please infer the relevant database columns from the user's question, which might use natural language or indirect references to the data stored in the database. When formulating SQL queries, ensure column names with spaces or special characters are enclosed in backticks. This helps to avoid syntax errors and ensures your query is executed correctly. Your response should strictly contain only the SQL query, free of any additional formatting or text.
+        """
+
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
