@@ -63,7 +63,7 @@ def get_sql_chain(db):
     **Recent Queries for Context**:
     {chat_history}
 
-    Your response MUST only contain the raw SQL query based on the context. The query should start directly with 'SELECT', 'INSERT', 'UPDATE', or 'DELETE' without any preceding labels or text like 'sql'. Ensure that any columns with spaces or special characters are correctly enclosed in backticks.
+    Your response MUST only contain the raw SQL query based on the context and schema ready to be executed in MySQL. The response must not have any preceding labels or text like 'sql', just the query itself. Ensure that any columns with spaces or special characters are correctly enclosed in backticks.
     """
 
     prompt = ChatPromptTemplate.from_template(template)
