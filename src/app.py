@@ -44,7 +44,6 @@ def get_sql_chain(db):
         logging.info(f"Schema: {schema}")
         return schema
 
-    # Updated template to instruct AI on formatting column names with spaces
     template = """
     You are a data analyst in a tourism company. Your task involves handling queries about the tourism articles database. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
 
@@ -56,8 +55,9 @@ def get_sql_chain(db):
     Recent user interactions for context:
     {chat_history}
 
-    Your response should strictly contain only the SQL query, free of any additional formatting or text.
+    Please write the SQL query directly starting with 'SELECT', 'INSERT', 'UPDATE', or 'DELETE', without any labels, headers, or additional text before the query.
     """
+
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
@@ -67,7 +67,6 @@ def get_sql_chain(db):
         | llm
         | StrOutputParser()
     )
-
 
 def clean_sql_query(sql_query):
     # Remove leading and trailing whitespaces
