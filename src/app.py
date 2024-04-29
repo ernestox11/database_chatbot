@@ -44,18 +44,20 @@ def get_sql_chain(db):
         logging.info(f"Schema: {schema}")
         return schema
 
+    # Updated template to instruct AI on formatting column names with spaces
     template = """
-        You are a data analyst in a tourism company. Your task involves handling queries about the tourism articles database. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
+    You are a data analyst in a tourism company. Your task involves handling queries about the tourism articles database. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
 
-        Schema details for reference:
-        <SCHEMA>{schema}</SCHEMA>
+    Use the provided schema information and recent conversation history to interpret the user's query. Generate a relevant SQL query by inferring the required database columns from the user's question. For any column names that contain spaces or special characters, ensure you wrap them in backticks (`), which is necessary for SQL syntax correctness in MySQL.
 
-        Recent user interactions for context:
-        {chat_history}
+    Schema details for reference:
+    <SCHEMA>{schema}</SCHEMA>
 
-        The database structure includes a table 'tourism_data' that captures each article's comprehensive details. Use the provided schema information and recent conversation history to interpret the user's query. Please infer the relevant database columns from the user's question, which might use natural language or indirect references to the data stored in the database. When formulating SQL queries, ensure column names with spaces or special characters are enclosed in backticks. This helps to avoid syntax errors and ensures your query is executed correctly. Your response should strictly contain only the SQL query, free of any additional formatting or text.
-        """
+    Recent user interactions for context:
+    {chat_history}
 
+    Your response should strictly contain only the SQL query, free of any additional formatting or text.
+    """
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
@@ -65,6 +67,7 @@ def get_sql_chain(db):
         | llm
         | StrOutputParser()
     )
+
 
 def clean_sql_query(sql_query):
     # Strip leading and trailing whitespaces and backticks
