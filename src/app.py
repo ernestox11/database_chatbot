@@ -22,7 +22,7 @@ DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_DATABASE = os.getenv("DB_DATABASE")
 
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def init_database(user: str, password: str, host: str, port: str, database: str) -> SQLDatabase:
     """Initialize and cache the database connection."""
     db_uri = f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{database}"
