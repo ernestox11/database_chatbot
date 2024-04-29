@@ -39,31 +39,6 @@ db = init_database(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE)
 if db is not None:
     st.success("Connected to database!")
 
-def validate_and_extract_sql_query(query):
-    # Pattern to find a SQL query within larger text
-    # This regex looks for strings that start with SQL keywords followed by typical SQL syntax
-    sql_pattern = r"\b(SELECT|INSERT|UPDATE|DELETE)\b\s+[\s\S]*?\b(FROM|INTO|SET|WHERE)\b[\s\S]*?(?=\s*(UNION|GROUP BY|ORDER BY|$))"
-    matches = re.findall(sql_pattern, query, re.IGNORECASE)
-
-    if not matches:
-        raise ValueError("No valid SQL query found in the input.")
-
-    # Assuming the first match is the valid query and extracting the whole matched string
-    valid_query = matches[0]
-
-    # Ensure valid_query is a string, not a tuple
-    if isinstance(valid_query, tuple):
-        valid_query = ' '.join(valid_query)
-
-    # Clean up: remove any extraneous characters or text around the query
-    valid_query = re.sub(r"^`|`$", "", valid_query).strip()  # Remove only leading/trailing backticks
-
-    # Debugging log
-    logging.info(f"Extracted SQL Query: {valid_query}")
-
-    return valid_query
-
-
 def get_sql_chain(db):
     def get_schema(_):
         schema = db.get_table_info()
@@ -120,7 +95,7 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
             schema=lambda _: db.get_table_info(),
             response=lambda vars: {
                 'query': vars['query'],  # Pass the raw query for logging
-                'result': db.run(validate_and_extract_sql_query(vars["query"]))
+                'result': db.run(vars["query"])
             },
         )
         | prompt
