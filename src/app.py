@@ -66,7 +66,11 @@ def get_sql_chain(db):
         | StrOutputParser()
     )
 
-  
+def clean_sql_query(sql_query):
+    # Strip leading and trailing whitespaces and backticks
+    cleaned_query = sql_query.strip().strip('`')
+    return cleaned_query
+
 def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     sql_chain = get_sql_chain(db)
     template = """
@@ -91,7 +95,7 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     # Assign dynamic variables via a lambda function to ensure they are fetched at runtime
     chain = (
         RunnablePassthrough.assign(query=lambda _: sql_chain, schema=lambda _: db.get_table_info())
-        | RunnablePassthrough.assign(response=lambda vars: db.run(vars["query"]))
+        | RunnablePassthrough.assign(response=lambda vars: db.run(clean_sql_query(vars["query"])))
         | prompt
         | llm
         | StrOutputParser()
