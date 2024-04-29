@@ -53,18 +53,19 @@ def get_sql_chain(db):
         return schema
 
     template = """
-    You are a data analyst in a tourism company. Your task involves handling queries about the tourism articles database. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
+    You are a data analyst tasked with creating SQL queries based on user requests. Each request pertains to data stored in a 'tourism_data' table which includes various columns like 'Article Title', 'Creation Date', etc. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
 
     Use the provided schema information and recent conversation history to interpret the user's query. Generate a relevant SQL query by inferring the required database columns from the user's question.
 
-    Schema details for reference:
+    **Schema Reference**:
     <SCHEMA>{schema}</SCHEMA>
 
-    Recent user interactions for context:
+    **Recent Queries for Context**:
     {chat_history}
 
-    Your response must contain only the raw mysql query starting with either 'SELECT', 'INSERT', 'UPDATE', or 'DELETE' ensuring it is correctly formatted (specially when column names have spaces or special characters) and nothing else, not even 'sql' string at the begining.
+    Generate a SQL query based on the context. The query should start directly with 'SELECT', 'INSERT', 'UPDATE', or 'DELETE' without any preceding labels or text like 'sql'. Ensure that any columns with spaces or special characters are correctly enclosed in backticks. 
     """
+
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
@@ -75,16 +76,25 @@ def get_sql_chain(db):
         | StrOutputParser()
     )
 
+
 def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     sql_chain = get_sql_chain(db)
     template = """
-    Translate the SQL query into a response in Spanish that accurately communicates the needed information based on the user's query about the tourism-related data stored in the 'tourism_data' table.
+    Translate the SQL query into a response in Spanish that communicates the information clearly. The response should be based on the user's query related to the 'tourism_data' table.
 
-    Detailed Schema Information: {schema}
-    Recent Conversation Extract: {chat_history}
-    Formulated SQL Query: {query}
-    Query Execution Result: {response}
+    **Schema Information**:
+    {schema}
+
+    **Conversation Context**:
+    {chat_history}
+
+    **SQL Query**:
+    {query}
+
+    **Execution Result**:
+    {response}
     """
+
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
@@ -115,6 +125,7 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
         st.error(error_message)
         logging.error(f"General Error: {error_message}")
         return "An unexpected error occurred. Please try again later."
+
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
