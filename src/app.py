@@ -63,7 +63,7 @@ def get_sql_chain(db):
     **Recent Queries for Context**:
     {chat_history}
 
-    Generate a SQL query based on the context. The query should start directly with 'SELECT', 'INSERT', 'UPDATE', or 'DELETE' without any preceding labels or text like 'sql'. Ensure that any columns with spaces or special characters are correctly enclosed in backticks. 
+    Your response MUST only contain the raw SQL query based on the context. The query should start directly with 'SELECT', 'INSERT', 'UPDATE', or 'DELETE' without any preceding labels or text like 'sql'. Ensure that any columns with spaces or special characters are correctly enclosed in backticks.
     """
 
     prompt = ChatPromptTemplate.from_template(template)
