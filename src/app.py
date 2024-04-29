@@ -39,16 +39,22 @@ db = init_database(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE)
 if db is not None:
     st.success("Connected to database!")
 
-def clean_sql_query(sql_query):
-    # Remove any accidental 'sql' prefix
-    cleaned_query = re.sub(r"^\s*sql\s+", "", sql_query, flags=re.IGNORECASE)
-    # Strip leading and trailing whitespaces and extraneous backticks
-    cleaned_query = cleaned_query.strip().strip('`')
-    # Further refine to ensure no backticks encapsulate the entire query
-    if cleaned_query.startswith("`") and cleaned_query.endswith("`"):
-        cleaned_query = cleaned_query[1:-1]
-    return cleaned_query
+def validate_and_extract_sql_query(query):
+    # Pattern to find a SQL query within larger text
+    # This regex looks for strings that start with SQL keywords followed by typical SQL syntax
+    sql_pattern = r"\b(SELECT|INSERT|UPDATE|DELETE)\b\s+[\s\S]*?\b(FROM|INTO|SET|WHERE)\b[\s\S]*"
+    matches = re.findall(sql_pattern, query, re.IGNORECASE)
 
+    if not matches:
+        raise ValueError("No valid SQL query found in the input.")
+
+    # Assuming the first match is the valid query
+    valid_query = matches[0][0]
+
+    # Clean up: remove any extraneous characters or text around the query
+    valid_query = re.sub(r"^`|`$", "", valid_query).strip()  # Remove only leading/trailing backticks
+
+    return valid_query
 
 def get_sql_chain(db):
     def get_schema(_):
@@ -104,7 +110,7 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     chain = (
         RunnablePassthrough.assign(query=sql_chain).assign(
             schema=lambda _: db.get_table_info(),
-            response=lambda vars: db.run(clean_sql_query(vars["query"])),
+            response=lambda vars: db.run(validate_and_extract_sql_query(vars["query"])),
         )
         | prompt
         | llm
