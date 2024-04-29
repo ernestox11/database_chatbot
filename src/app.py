@@ -35,17 +35,21 @@ if db is not None:
 
 def get_sql_chain(db):
     template = """
-    You are a data analyst tasked with creating SQL queries based on user requests. Each request pertains to data stored in a 'tourism_data' table which includes various columns like 'Article Title', 'Creation Date', etc. This database consists of detailed entries about various articles.
+    You are a data analyst in a tourism company. Your task involves handling queries about the tourism articles database. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
 
-    Use the provided schema information and recent conversation history to interpret the user's query. Generate a relevant SQL query by inferring the required database columns from the user's question. Make sure the query starts directly with 'SELECT', 'INSERT', 'UPDATE', or 'DELETE', and does not include any extraneous prefixes or text.
+    The database structure includes a table 'tourism_data' that captures each article's comprehensive details. Your task is to formulate SQL queries that precisely fetch the data as per the user's request.
 
-    **Schema Reference**:
+    Based on the table schema below and the conversation history, write a SQL query to answer the user's question.
+
     <SCHEMA>{schema}</SCHEMA>
 
-    **Recent Queries for Context**:
-    {chat_history}
+    Conversation History: {chat_history}
 
-    Ensure your response contains only the SQL query, correctly formatted for MySQL, especially ensuring proper use of backticks for column names with spaces or special characters.
+    Write only the SQL query and nothing else. Do not wrap the SQL query in any other text, not even backticks.
+
+    For example:
+    Question: How many articles mentioned 'sustainability' last month?
+    SQL Query: SELECT COUNT(*) FROM tourism_data WHERE topics LIKE '%sustainability%' AND publish_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH);
     """
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
@@ -63,20 +67,16 @@ def get_sql_chain(db):
 def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     sql_chain = get_sql_chain(db)
     template = """
-    Translate the SQL query into a response in Spanish that communicates the information clearly based on the user's query about the 'tourism_data' table.
+    As a data analyst, you are tasked with translating complex database queries into natural language answers that are easy to understand. Here, the user is inquiring about specific tourism-related data stored in our 'tourism_data' table.
 
-    **Detailed Schema Information**:
-    {schema}
+    Based on the table schema, the user's question, the SQL query you formulated, and the database's response, craft a response in Spanish that accurately and effectively communicates the needed information.
 
-    **Recent Conversation Extract**:
-    {chat_history}
+    <SCHEMA>{schema}</SCHEMA>
 
-    **Formulated SQL Query**:
-    {query}
-
-    **Query Execution Result**:
-    {response}
-    """
+    Conversation History: {chat_history}
+    SQL Query: <SQL>{query}</SQL>
+    User question: {question}
+    SQL Response: {response}"""
 
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
