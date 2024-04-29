@@ -40,11 +40,15 @@ if db is not None:
     st.success("Connected to database!")
 
 def clean_sql_query(sql_query):
-    # Regex to detect and remove any unwanted 'sql' prefix or surrounding backticks
-    cleaned_query = re.sub(r"^\s*sql\s+", "", sql_query, flags=re.IGNORECASE).strip()
-    # Remove backticks that might incorrectly wrap the entire query
-    cleaned_query = re.sub(r"^`(.*)`$", r"\1", cleaned_query).strip()
+    # Remove any accidental 'sql' prefix
+    cleaned_query = re.sub(r"^\s*sql\s+", "", sql_query, flags=re.IGNORECASE)
+    # Strip leading and trailing whitespaces and extraneous backticks
+    cleaned_query = cleaned_query.strip().strip('`')
+    # Further refine to ensure no backticks encapsulate the entire query
+    if cleaned_query.startswith("`") and cleaned_query.endswith("`"):
+        cleaned_query = cleaned_query[1:-1]
     return cleaned_query
+
 
 def get_sql_chain(db):
     def get_schema(_):
@@ -53,9 +57,9 @@ def get_sql_chain(db):
         return schema
 
     template = """
-    You are a data analyst tasked with creating SQL queries based on user requests. Each request pertains to data stored in a 'tourism_data' table which includes various columns like 'Article Title', 'Creation Date', etc. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
+    You are a data analyst tasked with creating SQL queries based on user requests. Each request pertains to data stored in a 'tourism_data' table which includes various columns like 'Article Title', 'Creation Date', etc. This database consists of detailed entries about various articles.
 
-    Use the provided schema information and recent conversation history to interpret the user's query. Generate a relevant SQL query by inferring the required database columns from the user's question.
+    Use the provided schema information and recent conversation history to interpret the user's query. Generate a relevant SQL query by inferring the required database columns from the user's question. Make sure the query starts directly with 'SELECT', 'INSERT', 'UPDATE', or 'DELETE', and does not include any extraneous prefixes or text.
 
     **Schema Reference**:
     <SCHEMA>{schema}</SCHEMA>
@@ -63,7 +67,7 @@ def get_sql_chain(db):
     **Recent Queries for Context**:
     {chat_history}
 
-    Your response MUST only contain the raw SQL query based on the context and schema ready to be executed in MySQL. The response must not have any preceding labels or text like 'sql', just the query itself. Ensure that any columns with spaces or special characters are correctly enclosed in backticks.
+    Ensure your response contains only the SQL query, correctly formatted for MySQL, especially ensuring proper use of backticks for column names with spaces or special characters.
     """
 
     prompt = ChatPromptTemplate.from_template(template)
@@ -76,22 +80,21 @@ def get_sql_chain(db):
         | StrOutputParser()
     )
 
-
 def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     sql_chain = get_sql_chain(db)
     template = """
-    Translate the SQL query into a response in Spanish that communicates the information clearly. The response should be based on the user's query related to the 'tourism_data' table.
+    Translate the SQL query into a response in Spanish that communicates the information clearly based on the user's query about the 'tourism_data' table.
 
-    **Schema Information**:
+    **Detailed Schema Information**:
     {schema}
 
-    **Conversation Context**:
+    **Recent Conversation Extract**:
     {chat_history}
 
-    **SQL Query**:
+    **Formulated SQL Query**:
     {query}
 
-    **Execution Result**:
+    **Query Execution Result**:
     {response}
     """
 
@@ -125,7 +128,6 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
         st.error(error_message)
         logging.error(f"General Error: {error_message}")
         return "An unexpected error occurred. Please try again later."
-
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
