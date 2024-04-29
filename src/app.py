@@ -110,7 +110,10 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     chain = (
         RunnablePassthrough.assign(query=sql_chain).assign(
             schema=lambda _: db.get_table_info(),
-            response=lambda vars: db.run(validate_and_extract_sql_query(vars["query"])),
+            response=lambda vars: {
+                'query': vars['query'],  # Pass the raw query for logging
+                'result': db.run(validate_and_extract_sql_query(vars["query"]))
+            },
         )
         | prompt
         | llm
@@ -122,8 +125,10 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
             "question": user_query,
             "chat_history": chat_history[-4:]  # To manage token usage
         })
-        logging.info(f"Response: {response}")
-        return response
+        # Log the raw SQL query before execution
+        logging.info(f"Executing SQL Query: {response['query']}")
+        logging.info(f"Response: {response['result']}")
+        return response['result']
     except SQLAlchemyError as e:
         error_message = "An error occurred while processing your query: " + str(e)
         st.error(error_message)
