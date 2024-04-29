@@ -45,19 +45,15 @@ def get_sql_chain(db):
         return schema
 
     template = """
-    You are a data analyst in a tourism company, responsible for handling queries regarding a database that tracks various articles. Each article entry includes details such as titles, URLs, domains, sentiments, and other categorizations relevant to tourism.
+    You are a data analyst in a tourism company. Your task involves handling queries about the tourism articles database. This database consists of detailed entries about various articles, each entry encompassing data such as article titles, URLs, domains, sentiments, and more detailed categorizations. Your role is to assist users by retrieving specific information based on their queries related to these articles.
 
-    The structure of the 'tourism_data' table includes various fields that store these details. Your task is to understand user queries, which may not directly mention specific column names, and translate them into SQL queries that fetch the required data.
-
-    Please infer the relevant database columns from the user's question, which might use natural language or indirect references to the data stored in the database. Use your understanding of the schema and the context provided by the user's conversation history to craft precise SQL queries.
-
-    Here is the schema for your reference:
+    Schema details for reference:
     <SCHEMA>{schema}</SCHEMA>
 
     Recent user interactions for context:
     {chat_history}
 
-    Respond with the SQL query alone, ensuring it is syntactically correct and relevant to the user's inquiry.
+    The database structure includes a table 'tourism_data' that captures each article's comprehensive details. Use the provided schema information and recent conversation history to interpret the user's query. Please infer the relevant database columns from the user's question, which might use natural language or indirect references to the data stored in the database. Ensure your response strictly contains only the SQL query, free of any additional formatting or text, and is relevant to the user's inquiry. Do not wrap the SQL query in any other text, not even backticks.
     """
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
@@ -69,7 +65,7 @@ def get_sql_chain(db):
         | StrOutputParser()
     )
 
-
+  
 def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     sql_chain = get_sql_chain(db)
     template = """
@@ -85,11 +81,16 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     prompt = ChatPromptTemplate.from_template(template)
     llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
+    # Prepare the variables for the prompt
+    chain_vars = {
+        "question": user_query,
+        "chat_history": chat_history[-4:],  # Use only the last 4 messages to keep the token count manageable
+    }
+
+    # Assign dynamic variables via a lambda function to ensure they are fetched at runtime
     chain = (
-        RunnablePassthrough.assign(query=sql_chain).assign(
-            schema=lambda _: db.get_table_info(),
-            response=lambda vars: db.run(vars["query"]),
-        )
+        RunnablePassthrough.assign(query=lambda _: sql_chain, schema=lambda _: db.get_table_info())
+        | RunnablePassthrough.assign(response=lambda vars: db.run(vars["query"]))
         | prompt
         | llm
         | StrOutputParser()
@@ -97,10 +98,7 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
 
     try:
         # Execute the chain to process and handle the query
-        response = chain.invoke({
-            "question": user_query,
-            "chat_history": chat_history[-4:],  # Use only the last 4 messages to avoid excessive token usage
-        })
+        response = chain.invoke(chain_vars)
         logging.info(f"Response: {response}")
         return response
     except SQLAlchemyError as e:
