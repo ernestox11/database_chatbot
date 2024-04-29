@@ -70,9 +70,14 @@ def get_sql_chain(db):
 
 
 def clean_sql_query(sql_query):
-    # Strip leading and trailing whitespaces and backticks
-    cleaned_query = sql_query.strip().strip('`')
+    # Correctly handle removing only the unwanted backticks around the entire SQL query
+    # Ensure to preserve backticks around column names within the query itself
+    cleaned_query = sql_query.strip()  # Remove only leading and trailing whitespace
+    # Check and remove backticks that may incorrectly wrap the entire query
+    if cleaned_query.startswith('`') and cleaned_query.endswith('`'):
+        cleaned_query = cleaned_query[1:-1]  # Remove the outermost backticks only
     return cleaned_query
+
 
 def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     sql_chain = get_sql_chain(db)
